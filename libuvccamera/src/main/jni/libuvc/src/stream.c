@@ -999,13 +999,53 @@ static void _uvc_stream_callback(struct libusb_transfer *transfer) {
 		break;
 	}
 
-	if (LIKELY(strmh->running && resubmit)) {
-		libusb_submit_transfer(transfer);
-	} else {
-		// XXX delete non-reusing transfer
-		// real implementation of deleting transfer moves to _uvc_delete_transfer
-		_uvc_delete_transfer(transfer);
-	}
+	if ( resubmit ) {
+	    if ( strmh->running ) {
+	      int libusbRet = libusb_submit_transfer(transfer);
+	      if (libusbRet < 0)
+	      {
+	        int i;
+	        pthread_mutex_lock(&strmh->cb_mutex);
+
+	        /* Mark transfer as deleted. */
+	        for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
+	          if (strmh->transfers[i] == transfer) {
+	            UVC_DEBUG("Freeing failed transfer %d (%p)", i, transfer);
+	            free(transfer->buffer);
+	            libusb_free_transfer(transfer);
+	            strmh->transfers[i] = NULL;
+	            break;
+	          }
+	        }
+	        if (i == LIBUVC_NUM_TRANSFER_BUFS) {
+	          UVC_DEBUG("failed transfer %p not found; not freeing!", transfer);
+	        }
+
+	        pthread_cond_broadcast(&strmh->cb_cond);
+	        pthread_mutex_unlock(&strmh->cb_mutex);
+	      }
+	    } else {
+	      int i;
+	      pthread_mutex_lock(&strmh->cb_mutex);
+
+	      /* Mark transfer as deleted. */
+	      for(i=0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
+	        if(strmh->transfers[i] == transfer) {
+	          UVC_DEBUG("Freeing orphan transfer %d (%p)", i, transfer);
+	          free(transfer->buffer);
+	          libusb_free_transfer(transfer);
+	          strmh->transfers[i] = NULL;
+	          break;
+	        }
+	      }
+	      if(i == LIBUVC_NUM_TRANSFER_BUFS ) {
+	        UVC_DEBUG("orphan transfer %p not found; not freeing!", transfer);
+	      }
+
+	      pthread_cond_broadcast(&strmh->cb_cond);
+	      pthread_mutex_unlock(&strmh->cb_mutex);
+	    }
+	  }
 }
 
 #if 0
@@ -1751,7 +1791,21 @@ uvc_error_t uvc_stream_get_frame(uvc_stream_handle_t *strmh,
 				ts.tv_sec += add_secs;
 				ts.tv_nsec += add_nsecs;
 
-				pthread_cond_timedwait(&strmh->cb_cond, &strmh->cb_mutex, &ts);
+                /* pthread_cond_timedwait FAILS with EINVAL if ts.tv_nsec > 1000000000 (1 billion)
+                 * Since we are just adding values to the timespec, we have to increment the seconds if nanoseconds is greater than 1 billion,
+                 * and then re-adjust the nanoseconds in the correct range.
+                 * */
+                ts.tv_sec += ts.tv_nsec / 1000000000;
+                ts.tv_nsec = ts.tv_nsec % 1000000000;
+
+                int err = pthread_cond_timedwait(&strmh->cb_cond, &strmh->cb_mutex, &ts);
+                if (err != 0) {
+                    *frame = NULL;
+                    pthread_mutex_unlock(&strmh->cb_mutex);
+                    return UVC_ERROR_TIMEOUT;
+                }
+
+
 			}
 
 			if (LIKELY(strmh->last_polled_seq < strmh->hold_seq)) {
@@ -1820,15 +1874,15 @@ uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh) {
 					// but this could lead to crash in _uvc_callback
 					// therefore we comment out these lines
 					// and free these objects in _uvc_iso_callback when strmh->running is false
-/*					free(strmh->transfers[i]->buffer);
+					free(strmh->transfers[i]->buffer);
 					libusb_free_transfer(strmh->transfers[i]);
-					strmh->transfers[i] = NULL; */
+					strmh->transfers[i] = NULL;
 				}
 			}
 		}
 
 		/* Wait for transfers to complete/cancel */
-		for (; 1 ;) {
+		/*for (; 1 ;) {
 			for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
 				if (strmh->transfers[i] != NULL)
 					break;
@@ -1836,7 +1890,7 @@ uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh) {
 			if (i == LIBUVC_NUM_TRANSFER_BUFS)
 				break;
 			pthread_cond_wait(&strmh->cb_cond, &strmh->cb_mutex);
-		}
+		}*/
 		// Kick the user thread awake
 		pthread_cond_broadcast(&strmh->cb_cond);
 	}
@@ -1862,7 +1916,7 @@ uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh) {
 void uvc_stream_close(uvc_stream_handle_t *strmh) {
 	UVC_ENTER();
 
-	if (!strmh) { UVC_EXIT_VOID() };
+	if (!strmh) { UVC_EXIT_VOID(); };
 
 	if (strmh->running)
 		uvc_stream_stop(strmh);
