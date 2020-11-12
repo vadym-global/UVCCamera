@@ -31,7 +31,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.StringRes;
-import android.support.v7.app.AppCompatActivity;
+//import android.support.v7.app.AppCompatActivity;
+import android.app.Activity;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -44,7 +45,7 @@ import com.serenegiant.utils.PermissionCheck;
  * Created by saki on 2016/11/18.
  *
  */
-public class BaseActivity extends AppCompatActivity
+public class BaseActivity extends Activity
 	implements MessageDialogFragmentV4.MessageDialogListener {
 
 	private static boolean DEBUG = false;	// FIXME 実働時はfalseにセットすること
@@ -278,9 +279,10 @@ public class BaseActivity extends AppCompatActivity
 	 */
 	protected boolean checkPermissionWriteExternalStorage() {
 		if (!PermissionCheck.hasWriteExternalStorage(this)) {
-			MessageDialogFragmentV4.showDialog(this, REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE,
-				R.string.permission_title, R.string.permission_ext_storage_request,
-				new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE});
+			//MessageDialogFragmentV4.showDialog(this, REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE,
+			//	R.string.permission_title, R.string.permission_ext_storage_request,
+			//	new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE});
+                        requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
 			return false;
 		}
 		return true;
@@ -293,9 +295,10 @@ public class BaseActivity extends AppCompatActivity
 	 */
 	protected boolean checkPermissionAudio() {
 		if (!PermissionCheck.hasAudio(this)) {
-			MessageDialogFragmentV4.showDialog(this, REQUEST_PERMISSION_AUDIO_RECORDING,
-				R.string.permission_title, R.string.permission_audio_recording_request,
-				new String[]{Manifest.permission.RECORD_AUDIO});
+			//MessageDialogFragmentV4.showDialog(this, REQUEST_PERMISSION_AUDIO_RECORDING,
+			//	R.string.permission_title, R.string.permission_audio_recording_request,
+			//	new String[]{Manifest.permission.RECORD_AUDIO});
+                        requestPermissions(new String[] {Manifest.permission.RECORD_AUDIO}, 1);
 			return false;
 		}
 		return true;
@@ -308,9 +311,10 @@ public class BaseActivity extends AppCompatActivity
 	 */
 	protected boolean checkPermissionNetwork() {
 		if (!PermissionCheck.hasNetwork(this)) {
-			MessageDialogFragmentV4.showDialog(this, REQUEST_PERMISSION_NETWORK,
-				R.string.permission_title, R.string.permission_network_request,
-				new String[]{Manifest.permission.INTERNET});
+			//MessageDialogFragmentV4.showDialog(this, REQUEST_PERMISSION_NETWORK,
+			//	R.string.permission_title, R.string.permission_network_request,
+			//	new String[]{Manifest.permission.INTERNET});
+                        requestPermissions(new String[] {Manifest.permission.INTERNET}, 1);
 			return false;
 		}
 		return true;
@@ -323,9 +327,10 @@ public class BaseActivity extends AppCompatActivity
 	 */
 	protected boolean checkPermissionCamera() {
 		if (!PermissionCheck.hasCamera(this)) {
-			MessageDialogFragmentV4.showDialog(this, REQUEST_PERMISSION_CAMERA,
-				R.string.permission_title, R.string.permission_camera_request,
-				new String[]{Manifest.permission.CAMERA});
+			//MessageDialogFragmentV4.showDialog(this, REQUEST_PERMISSION_CAMERA,
+			//	R.string.permission_title, R.string.permission_camera_request,
+			//	new String[]{Manifest.permission.CAMERA});
+                        requestPermissions(new String[] {Manifest.permission.CAMERA}, 1);
 			return false;
 		}
 		return true;
